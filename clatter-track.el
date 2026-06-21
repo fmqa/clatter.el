@@ -388,17 +388,20 @@ Ignores its arguments; suitable for `window-buffer-change-functions'."
 
 ;; --- Activity hooks ---
 
-(defun clatter-track--on-activity (_conn _sender _target _text &rest _args)
+(defun clatter-track--on-activity (conn sender _target _text &rest _args)
   "Update track on PRIVMSG activity."
-  (clatter-track--update))
+  (unless (equal (clatter-connection-nick conn) (clatter-prefix-nick sender))
+    (clatter-track--update)))
 
-(defun clatter-track--on-activity-action (_conn _sender _target _text &rest _args)
+(defun clatter-track--on-activity-action (conn sender _target _text &rest _args)
   "Update track on ACTION activity."
-  (clatter-track--update))
+  (unless (equal (clatter-connection-nick conn) (clatter-prefix-nick sender))
+    (clatter-track--update)))
 
-(defun clatter-track--on-activity-notice (_conn _sender _target _text &rest _args)
+(defun clatter-track--on-activity-notice (conn sender _target _text &rest _args)
   "Update track on NOTICE activity."
-  (clatter-track--update))
+  (unless (equal (clatter-connection-nick conn) (clatter-prefix-nick sender))
+    (clatter-track--update)))
 
 ;; Tracking is enabled by `clatter-setup' when `clatter-track-enabled'
 ;; is non-nil, so that merely loading this file has no side effects.
