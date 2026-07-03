@@ -145,7 +145,7 @@ Accumulates partial lines and dispatches complete ones."
         ;; number of trailing CRs: the builtin network transport auto
         ;; converts CRLF to LF, but the external subprocess pipe does not,
         ;; so the raw CR must be removed here to avoid trailing ^M.
-        (while (string-match "\r*\n" data)
+        (while (string-match "[\n\r]+" data)
           (let ((line (substring data 0 (match-beginning 0))))
             (setq data (substring data (match-end 0)))
             (when (> (length line) 0)
