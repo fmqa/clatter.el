@@ -118,6 +118,14 @@
   :type 'string
   :group 'clatter)
 
+;; --- Post-JOIN NAMES delay ---
+
+(defcustom clatter-ui-names-delay 0.5
+  "Delay until NAMES is sent after joining a channel.
+If nil, NAMES is sent immediately."
+  :type 'number
+  :group 'clatter)
+
 ;; --- Message insertion ---
 
 (defvar-local clatter--prompt-marker nil
@@ -785,7 +793,11 @@ the buffer margin-width variables."
     (clatter-ui-setup-buffer-if-needed buf)
     (clatter-nick-add buf sender-nick)
     (when (string-equal sender-nick my-nick)
-      (clatter-send conn (clatter-irc-names channel))
+      (if clatter-ui-names-delay
+          (run-at-time clatter-ui-names-delay nil
+                       (lambda ()
+                         (clatter-send conn (clatter-irc-names channel))))
+          (clatter-send conn (clatter-irc-names channel)))
       (display-buffer buf))
     (clatter-insert-system buf
                            (if (and realname (not (string= sender-nick realname)))
