@@ -129,6 +129,37 @@
 (defvar-local clatter--messages-marker nil
   "Marker for the start of the message area (below the input line).")
 
+(defun clatter-goto-next-message ()
+  "Jump to the next message in the buffer."
+  (interactive)
+  (and-let* ((position (next-single-property-change (point) 'clatter-sender)))
+    (goto-char position)))
+
+(defun clatter-goto-previous-message ()
+  "Jump to the previous message in the buffer."
+  (interactive)
+  (and-let* ((position (previous-single-property-change (point) 'clatter-sender)))
+    (goto-char position)))
+
+(defun clatter-in-input-p (&optional position)
+  "Returns t if POSITION is in the input area.
+POSITION defaults to (POINT) if not givenn."
+  (unless position
+    (setq position (point)))
+  (and clatter--input-marker
+       (>= position clatter--input-marker)
+       (or (eq clatter-message-order 'oldest-first)
+           (and clatter--messages-marker
+                (< position clatter--messages-marker)))))
+
+(defun clatter-complete-or-goto-next-message ()
+  "If in the input area, complete the word at point. Otherwise jump to the next
+message in the buffer."
+  (interactive)
+  (if (clatter-in-input-p)
+      (completion-at-point)
+    (clatter-goto-next-message)))
+
 (defun clatter--fool-invisibility-p (invisible)
   "Return non-nil if INVISIBLE includes the fool visibility category."
   (or (eq invisible 'clatter-fool)
@@ -1453,7 +1484,8 @@ Requires the server to support the message-tags capability."
   (add-hook 'clatter-mode-hook #'clatter-ui--setup-eldoc)
   ;; Key bindings for input
   (define-key clatter-mode-map (kbd "RET") #'clatter-send-input)
-  (define-key clatter-mode-map (kbd "TAB") #'completion-at-point)
+  (define-key clatter-mode-map (kbd "TAB") #'clatter-complete-or-goto-next-message)
+  (define-key clatter-mode-map (kbd "<backtab>") #'clatter-goto-previous-message)
   (define-key clatter-mode-map (kbd "M-p") #'clatter-set-prev-input)
   (define-key clatter-mode-map (kbd "M-n") #'clatter-set-next-input)
   (define-key clatter-mode-map (kbd "C-a") #'clatter-bol)
