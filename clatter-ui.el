@@ -132,14 +132,24 @@
 (defun clatter-goto-next-message ()
   "Jump to the next message in the buffer."
   (interactive)
-  (and-let* ((position (next-single-property-change (point) 'clatter-sender)))
-    (goto-char position)))
+  (let ((pos (point))
+        found)
+    (while (and (not found)
+                (setq pos (next-single-property-change pos 'clatter-sender)))
+      (unless (invisible-p pos)
+        (setq found t)
+        (goto-char pos)))))
 
 (defun clatter-goto-previous-message ()
   "Jump to the previous message in the buffer."
   (interactive)
-  (and-let* ((position (previous-single-property-change (point) 'clatter-sender)))
-    (goto-char position)))
+  (let ((pos (point))
+        found)
+    (while (and (not found)
+                (setq pos (previous-single-property-change pos 'clatter-sender)))
+      (unless (invisible-p pos)
+        (setq found t)
+        (goto-char pos)))))
 
 (defun clatter-in-input-p (&optional position)
   "Returns t if POSITION is in the input area.
