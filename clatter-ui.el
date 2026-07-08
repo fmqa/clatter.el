@@ -137,6 +137,10 @@
     (while (and (not found)
                 (setq pos (next-single-property-change pos 'clatter-sender)))
       (unless (invisible-p pos)
+        (save-excursion
+          (goto-char pos)
+          (skip-chars-forward "[:space:]")
+          (setq pos (point)))
         (setq found t)
         (goto-char pos)))))
 
@@ -148,6 +152,10 @@
     (while (and (not found)
                 (setq pos (previous-single-property-change pos 'clatter-sender)))
       (unless (invisible-p pos)
+        (save-excursion
+          (goto-char pos)
+          (skip-chars-backward "[:space:]")
+          (setq pos (point)))
         (setq found t)
         (goto-char pos)))))
 
