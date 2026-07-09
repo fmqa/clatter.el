@@ -249,8 +249,9 @@ append at the bottom like a traditional IRC client."
           (when oldest-first
             (dolist (win (get-buffer-window-list buffer nil t))
               (with-selected-window win
-                (goto-char (point-max))
-                (recenter -1)))))
+                (save-excursion
+                  (goto-char (point-max))
+                  (recenter -1))))))
         ;; Messages inserted above the input (bottom/oldest-first prompt)
         ;; push the input down.  Without this, the user's pending undo
         ;; entries would still point at the old positions and an undo
