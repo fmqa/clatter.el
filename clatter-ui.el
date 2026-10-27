@@ -3279,6 +3279,27 @@ on screen, so it renders at the buffer's oldest end, in the direction
                 (pcase msg-type
                   ('action (clatter-insert-action buf sender text conn time invisible))
                   ('privmsg (clatter-insert-privmsg buf sender text conn time invisible)))))))
+          ;; Feed the smart filter from history playback too, so nick
+          ;; completion ranks nicks who chatted in the backlog.
+          (let ((network (clatter-connection-network-id conn))
+                (my-nick (clatter-connection-nick conn)))
+            (dolist (msg (if backlog (reverse messages) messages))
+              (let ((sender (plist-get msg :sender)))
+                (when (and (memq (plist-get msg :type) '(privmsg action))
+                           (eq 'channel (buffer-local-value
+                                          'clatter--buffer-type buf))
+                           (listp (buffer-local-value
+                                   'buffer-invisibility-spec buf))
+                           (memq 'noise (buffer-local-value
+                                         'buffer-invisibility-spec buf))
+                           ;; Parity with the live path (clatter-ui.el:2662):
+                           ;; muted nicks and my own nick never feed the
+                           ;; smart filter, so they can't rank in completion.
+                           (not (clatter-muted-p (list sender nil nil)
+                                                 network))
+                           (not (string-equal-ignore-case my-nick sender)))
+                  (clatter-smart-put buf sender 'privmsg
+                                     (plist-get msg :time))))))
         ;; Insert end separator
         (when (> count 0)
           (clatter--insert-message buf (if backlog sep-text end-sep-text) t))))

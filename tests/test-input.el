@@ -12,6 +12,7 @@
 (require 'clatter-ui)
 (require 'clatter-commands)
 (require 'clatter-completion)
+(require 'clatter-smart)
 
 (defmacro clatter-input-test--with (order &rest body)
   "Run BODY in a fresh clatter-mode buffer with message ORDER and a prompt."
@@ -131,6 +132,24 @@ Within BODY, `buffer' and `window' name the temporary buffer and its window."
         (insert "alice")
         (funcall (plist-get (nthcdr 3 capf) :exit-function) 'alice 'finished))
       (should (equal (clatter--get-input) "alice")))))
+
+(ert-deftest clatter-completion-nicks-sorted-by-activity ()
+  "Most recently active nicks sort first; ties fall back alphabetical."
+  (with-temp-buffer
+    (setq-local clatter--nick-list (make-hash-table :test 'equal))
+    (puthash "bob" '("" . "Bob") clatter--nick-list)
+    (puthash "alice" '("" . "Alice") clatter--nick-list)
+    (puthash "carol" '("" . "Carol") clatter--nick-list)
+    ;; Bob chatted most recently, then Carol; Alice chatted most overall
+    ;; but longer ago, and lurked (join only) after that.
+    (clatter-smart-put (current-buffer) "alice" 'privmsg (time-subtract nil 300))
+    (clatter-smart-put (current-buffer) "alice" 'privmsg (time-subtract nil 200))
+    (clatter-smart-put (current-buffer) "carol" 'privmsg (time-subtract nil 60))
+    (clatter-smart-put (current-buffer) "bob" 'privmsg (time-subtract nil 10))
+    (should (equal (clatter-completion--nicks) '("Bob" "Carol" "Alice")))
+    ;; No smart data yet: plain alphabetical.
+    (setq-local clatter-smart-data nil)
+    (should (equal (clatter-completion--nicks) '("Alice" "Bob" "Carol")))))
 
 (ert-deftest clatter-prompt-format-expands-placeholders ()
   "String prompt formats expand target, nick, network, and percent."

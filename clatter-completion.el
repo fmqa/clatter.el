@@ -17,6 +17,7 @@
 (require 'clatter-config)
 (require 'clatter-model)
 (require 'clatter-commands)
+(require 'clatter-smart)
 
 ;; --- Configuration ---
 
@@ -33,12 +34,29 @@ An empty string inserts nothing.  Legacy boolean t from
 ;; --- Nick completion ---
 
 (defun clatter-completion--nicks ()
-  "Return list of nicks from current buffer's nick list."
+  "Return nicks from current buffer's nick list, most recently active first.
+Recency is the smart filter's last-signal time, so a nick who just
+chatted outranks long-term chatters; ties fall back to `string<'."
   (when clatter--nick-list
-    (let (nicks)
-      (maphash (lambda (_nick prefix-and-nick) (push (cdr prefix-and-nick) nicks))
+    (let ((smart (clatter-smart-on (current-buffer)))
+          nicks)
+      (maphash (lambda (_nick prefix-and-nick)
+                 (let ((entry (and smart
+                                   (gethash (downcase (cdr prefix-and-nick))
+                                             smart))))
+                   ;; ponytail: ranks by smart last-signal time rather
+                   ;; than a separate recency tracker.
+                   (push (cons (cdr prefix-and-nick)
+                               (if entry
+                                   (clatter-smart--entry-last-signal entry)
+                                 0))
+                         nicks)))
                clatter--nick-list)
-      (sort nicks #'string<))))
+      (sort nicks (lambda (a b)
+                    (if (/= (cdr a) (cdr b))
+                        (> (cdr a) (cdr b))
+                      (string< (car a) (car b)))))
+      (mapcar #'car nicks))))
 
 (defun clatter-completion--nick-capf ()
   "Completion-at-point function for nicks.
@@ -54,6 +72,10 @@ Completes nick names from the current channel."
            (at-start (= start clatter--input-marker)))
       (list start end nicks
             :exclusive 'no
+            :display-sort-function #'identity
+            ;; Keep the activity ranking from `clatter-completion--nicks':
+            ;; without this, Corfu re-sorts by length+alpha and buries
+            ;; recently active nicks.
             :annotation-function
             (lambda (nick)
               (when clatter--nick-list

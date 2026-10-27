@@ -42,7 +42,9 @@ settings continue to be honored independently."
 (defvar clatter-smart-data nil
   "Smart filter state keyed by nick.
 
-Each value is an improper list (ACTIVE-P SIGNAL-COUNT . NOISE-COUNT).")
+Each value is a list (ACTIVE-P SIGNAL-COUNT NOISE-COUNT LAST-SIGNAL)
+where LAST-SIGNAL is the float time of the nick's most recent
+non-noise event.")
 
 (defun clatter-smart-on (buf)
   "Get smart filter data for BUF."
@@ -53,18 +55,24 @@ Each value is an improper list (ACTIVE-P SIGNAL-COUNT . NOISE-COUNT).")
 
 (defun clatter-smart--entry-signal-count (entry)
   "Return signal count from smart state ENTRY."
-  (or (cadr entry) 0))
+  (or (nth 1 entry) 0))
 
 (defun clatter-smart--entry-noise-count (entry)
   "Return noise count from smart state ENTRY."
-  (or (cddr entry) 0))
+  (or (nth 2 entry) 0))
 
 (defun clatter-smart--entry-active-p (entry)
   "Return non-nil when smart state ENTRY has observed signal."
   (car entry))
 
-(defun clatter-smart-put (buf nick elt)
-  "Record ELT for NICK in BUF and return an SNR value if NICK is active."
+(defun clatter-smart--entry-last-signal (entry)
+  "Return float time of ENTRY's most recent signal, or 0."
+  (or (nth 3 entry) 0))
+
+(defun clatter-smart-put (buf nick elt &optional time)
+  "Record ELT for NICK in BUF and return an SNR value if NICK is active.
+TIME is the event's timestamp (any `float-time' input, default now);
+it is stored as the nick's last signal for non-noise events."
   ;; (stringp elt) => t implies NICK changed to ELT.
   ;; Normalize nicks.
   (setq nick (downcase nick))
@@ -73,10 +81,11 @@ Each value is an improper list (ACTIVE-P SIGNAL-COUNT . NOISE-COUNT).")
   (let* ((is-nick-change (and (stringp nick)
                               (stringp elt)))
          (data (clatter-smart-on buf))
-         (activep-sn (gethash nick data))
-         (signal-count (clatter-smart--entry-signal-count activep-sn))
-         (noise-count (clatter-smart--entry-noise-count activep-sn))
-         (activep (clatter-smart--entry-active-p activep-sn))
+         (entry (gethash nick data))
+         (signal-count (clatter-smart--entry-signal-count entry))
+         (noise-count (clatter-smart--entry-noise-count entry))
+         (activep (clatter-smart--entry-active-p entry))
+         (last-signal (clatter-smart--entry-last-signal entry))
          (is-noise (memq (if is-nick-change 'nick elt) clatter-smart-noise)))
     (when is-nick-change
       (remhash nick data)
@@ -84,7 +93,9 @@ Each value is an improper list (ACTIVE-P SIGNAL-COUNT . NOISE-COUNT).")
     (setq signal-count (+ signal-count (if is-noise 0 1)))
     (setq noise-count (+ noise-count (if is-noise 1 0)))
     (setq activep (or activep (not is-noise)))
-    (puthash nick (cons activep (cons signal-count noise-count)) data)
+    (unless is-noise
+      (setq last-signal (float-time (or time (current-time)))))
+    (puthash nick (list activep signal-count noise-count last-signal) data)
     (and activep
          ;; Float division: integer division would collapse the ratio to 0 or 1
          ;; and make `clatter-smart-threshold' meaningless.

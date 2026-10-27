@@ -537,6 +537,33 @@ timestamp is a parameter rather than a server-time tag."
         (kill-buffer browser))
       (clatter-test-cleanup))))
 
+(ert-deftest clatter-chathistory-batch-feeds-completion-ranking ()
+  "History playback feeds smart data, ranking backlog chatters first."
+  (let ((conn (clatter-test-make-connection "testnet" "me"))
+        (clatter-privmsg-hook nil)
+        (clatter-action-hook nil)
+        (clatter-join-hook nil)
+        (clatter-batch-complete-hook nil))
+    (unwind-protect
+        (let* ((buf (clatter-get-or-create-buffer "testnet" "#chan"))
+               (old (time-subtract nil (* 24 3600)))
+               (new (time-subtract nil 60)))
+          (clatter-ui-setup-buffer-if-needed buf)
+          (with-current-buffer buf
+            (setq-local clatter--nick-list (make-hash-table :test 'equal))
+            (puthash "bob" '("" . "Bob") clatter--nick-list)
+            (puthash "alice" '("" . "Alice") clatter--nick-list))
+          ;; Bob chatted yesterday, Alice just now (in playback order).
+          (clatter-ui--on-batch-complete
+           conn "chathistory" "#chan"
+           (list (list :type 'privmsg :sender "Bob" :text "old" :time old)
+                 (list :type 'privmsg :sender "Alice" :text "hi" :time new)
+                 (list :type 'join :sender "Bob" :text "" :time nil)))
+          (should (equal (with-current-buffer buf
+                           (clatter-completion--nicks))
+                         '("Alice" "Bob"))))
+      (clatter-test-cleanup))))
+
 (provide 'test-chathistory)
 
 ;;; test-chathistory.el ends here
